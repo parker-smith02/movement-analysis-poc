@@ -1,0 +1,32 @@
+filename,group,move_id,notes
+calibration.MOV,calibration,,
+sf1-1.MOV,static-fixed,pos1,
+sf1-2.MOV,static-fixed,pos1,
+sf1-3.MOV,static-fixed,pos1,
+sr1-1.MOV,static-reset,pos1,
+sr1-2.MOV,static-reset,pos1,
+sr1-3.MOV,static-reset,pos1,
+sf2-1.MOV,static-fixed,pos2,
+sf2-2.MOV,static-fixed,pos2,
+sf2-3.MOV,static-fixed,pos2,
+sf3-1.MOV,static-fixed,pos3,
+sf3-2.MOV,static-fixed,pos3,
+sf3-3.MOV,static-fixed,pos3,
+m1-1.MOV,movement,move1,
+m1-2.MOV,movement,move1,
+m1-3.MOV,movement,move1,
+m2-1.MOV,movement,move2,generating foot occluded
+m2-2.MOV,movement,move2,generating foot occluded
+m2-3.MOV,movement,move2,generating foot occluded
+m3-1.MOV,movement,move3,heel hook
+m3-2.MOV,movement,move3,heel hook
+m3-3.MOV,movement,move3,heel hook
+m4-1.MOV,movement,move4,deep back flag
+m4-2.MOV,movement,move4,deep back flag
+m4-3.MOV,movement,move4,deep back flag
+m5-1.MOV,movement,move5,static drop knee
+m5-2.MOV,movement,move5,static drop knee
+m5-3.MOV,movement,move5,static drop knee foot pops
+m6-1.MOV,movement,move6,
+m6-2.MOV,movement,move6,
+m6-3.MOV,movement,move6,

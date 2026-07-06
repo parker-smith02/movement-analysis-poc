@@ -52,8 +52,13 @@ def vis_color(vis: float) -> tuple[int, int, int]:  # BGR
     return (0, 220, 0)          # green
 
 
-def render_clip(clip_path: Path, model_tag: str) -> Path:
-    csv_path = landmarks_csv_path(LANDMARKS_DIR, clip_path, model_tag)
+def render_clip(
+    clip_path: Path,
+    model_tag: str,
+    landmarks_dir: Path = LANDMARKS_DIR,
+    overlays_dir: Path = OVERLAYS_DIR,
+) -> Path:
+    csv_path = landmarks_csv_path(landmarks_dir, clip_path, model_tag)
     if not csv_path.exists():
         raise FileNotFoundError(f"no extraction for {clip_path.name}: {csv_path}")
     df, meta = read_landmarks(csv_path)
@@ -63,8 +68,8 @@ def render_clip(clip_path: Path, model_tag: str) -> Path:
     if not cap.isOpened():
         raise RuntimeError(f"cannot open {clip_path}")
 
-    OVERLAYS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = OVERLAYS_DIR / f"{clip_path.stem}_{model_tag}_overlay.mp4"
+    overlays_dir.mkdir(parents=True, exist_ok=True)
+    out_path = overlays_dir / f"{clip_path.stem}_{model_tag}_overlay.mp4"
     w, h, fps = meta["width"], meta["height"], meta["fps"]
     writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
     scale = max(1.0, h / 1080)  # keep line widths sensible on 4K clips
@@ -108,16 +113,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("clips", nargs="*", type=Path)
     parser.add_argument("--model", default="mediapipe")
+    parser.add_argument("--landmarks-dir", type=Path, default=LANDMARKS_DIR,
+                        help="where the landmark CSVs live (default: exp01 pool)")
+    parser.add_argument("--out-dir", type=Path, default=None,
+                        help="overlay output dir (default: overlays/ next to landmarks)")
     args = parser.parse_args()
+
+    out_dir = args.out_dir or args.landmarks_dir.parent / "overlays"
 
     if args.clips:
         clips = args.clips
     else:
         # every clip in footage/ that has an extraction for this model
         clips = [
-            p for p in sorted(FOOTAGE_DIR.iterdir())
+            p for p in sorted(FOOTAGE_DIR.rglob("*"))
             if p.suffix.lower() in {".mp4", ".mov", ".avi", ".mkv"}
-            and landmarks_csv_path(LANDMARKS_DIR, p, args.model).exists()
+            and landmarks_csv_path(args.landmarks_dir, p, args.model).exists()
         ]
     if not clips:
         print("nothing to render — extract landmarks first")
@@ -125,7 +136,7 @@ def main() -> int:
 
     for clip in clips:
         print(f"rendering: {clip.name} [{args.model}] ...", flush=True)
-        out = render_clip(clip, args.model)
+        out = render_clip(clip, args.model, args.landmarks_dir, out_dir)
         print(f"  -> {out.name}")
     return 0
 

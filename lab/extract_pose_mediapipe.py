@@ -48,7 +48,9 @@ def make_landmarker() -> vision.PoseLandmarker:
     return vision.PoseLandmarker.create_from_options(options)
 
 
-def extract_clip(clip_path: Path, landmarker: vision.PoseLandmarker) -> Path:
+def extract_clip(
+    clip_path: Path, landmarker: vision.PoseLandmarker, out_dir: Path = OUT_DIR
+) -> Path:
     cap = cv2.VideoCapture(str(clip_path))
     if not cap.isOpened():
         raise RuntimeError(f"cannot open {clip_path}")
@@ -106,28 +108,42 @@ def extract_clip(clip_path: Path, landmarker: vision.PoseLandmarker) -> Path:
         extracted_at=datetime.now(timezone.utc).isoformat(),
         notes=notes,
     )
-    return write_landmarks(OUT_DIR, clip_path, MODEL_TAG, rows, meta)
+    return write_landmarks(out_dir, clip_path, MODEL_TAG, rows, meta)
+
+
+def expand_clip_args(paths: list[Path], default_dir: Path) -> list[Path]:
+    """Clip paths as given; directories expand to the videos inside them."""
+    if not paths:
+        paths = [default_dir]
+    clips: list[Path] = []
+    for p in paths:
+        if p.is_dir():
+            clips.extend(sorted(
+                q for q in p.iterdir() if q.suffix.lower() in VIDEO_EXTS
+            ))
+        else:
+            clips.append(p)
+    return clips
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("clips", nargs="*", type=Path,
-                        help="specific clips (default: all in footage/)")
+                        help="clips or directories of clips (default: footage/)")
     parser.add_argument("--force", action="store_true",
                         help="re-extract clips that already have a landmarks CSV")
+    parser.add_argument("--out", type=Path, default=OUT_DIR,
+                        help="landmarks output directory (default: exp01 pool)")
     args = parser.parse_args()
 
-    clips = args.clips or sorted(
-        p for p in FOOTAGE_DIR.iterdir()
-        if p.suffix.lower() in VIDEO_EXTS
-    )
+    clips = expand_clip_args(args.clips, FOOTAGE_DIR)
     if not clips:
         print(f"no clips found in {FOOTAGE_DIR} — drop videos there first")
         return 1
 
     landmarker = None
     for clip in clips:
-        out_csv = landmarks_csv_path(OUT_DIR, clip, MODEL_TAG)
+        out_csv = landmarks_csv_path(args.out, clip, MODEL_TAG)
         if out_csv.exists() and not args.force:
             print(f"skip (exists): {out_csv.name}")
             continue
@@ -136,7 +152,7 @@ def main() -> int:
         # must not leak between clips.
         landmarker = make_landmarker()
         print(f"extracting: {clip.name} ...", flush=True)
-        path = extract_clip(clip, landmarker)
+        path = extract_clip(clip, landmarker, args.out)
         landmarker.close()
         print(f"  -> {path.name}")
     return 0

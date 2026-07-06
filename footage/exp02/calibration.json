@@ -1,0 +1,30 @@
+{
+  "climber_height_cm": null,
+  "person_extent": {
+    "comment": "click head-top and floor with pick_points.py",
+    "clip": "",
+    "frame": 0,
+    "top_px": [0, 0],
+    "bottom_px": [0, 0]
+  },
+  "hold_references": [
+    {
+      "label": "horizontal",
+      "spacing_cm": null,
+      "comment": "two roughly LEVEL holds at working-zone depth, tape-measured center-to-center",
+      "clip": "",
+      "frame": 0,
+      "a_px": [0, 0],
+      "b_px": [0, 0]
+    },
+    {
+      "label": "vertical",
+      "spacing_cm": null,
+      "comment": "OPTIONAL: two vertically-separated holds; tests whether calibration is orientation-sensitive on the oblique wall",
+      "clip": "",
+      "frame": 0,
+      "a_px": [0, 0],
+      "b_px": [0, 0]
+    }
+  ]
+}

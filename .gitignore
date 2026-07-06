@@ -2,6 +2,11 @@
 footage/*
 !footage/.gitkeep
 !footage/manifest.csv
+# exp02 takes live in footage/exp02/; only the small text configs are tracked
+!footage/exp02/
+footage/exp02/*
+!footage/exp02/takes.csv
+!footage/exp02/calibration.json
 
 # Video files anywhere in the repo (overlay renders, etc.)
 *.mp4
