@@ -1,0 +1,100 @@
+{
+  "_comment": "Hand-computed fixtures for the layer-2 metrics functions. Consumed by lab/test_metrics.py (Python) and, later, the TypeScript metrics tests — both implementations must pass every case unchanged. Points are [x, y] in y-down image coordinates. expected: null means NaN.",
+  "cases": [
+    {
+      "function": "midpoint",
+      "inputs": { "a": [0, 0], "b": [2, 4] },
+      "expected": [1, 2]
+    },
+    {
+      "function": "midpoint",
+      "inputs": { "a": [-3, 7.5], "b": [3, -7.5] },
+      "expected": [0, 0]
+    },
+    {
+      "function": "distance",
+      "inputs": { "a": [0, 0], "b": [3, 4] },
+      "expected": 5
+    },
+    {
+      "function": "distance",
+      "inputs": { "a": [1.5, 2.5], "b": [1.5, 2.5] },
+      "expected": 0
+    },
+    {
+      "function": "height_above",
+      "inputs": { "y": 1500, "reference_y": 2000 },
+      "expected": 500
+    },
+    {
+      "function": "height_above",
+      "inputs": { "y": 0.25, "reference_y": 1.0 },
+      "expected": 0.75
+    },
+    {
+      "function": "height_above",
+      "inputs": { "y": 2100, "reference_y": 2000 },
+      "expected": -100
+    },
+    {
+      "function": "hip_center",
+      "inputs": { "left_hip": [100, 1500], "right_hip": [200, 1600] },
+      "expected": [150, 1550]
+    },
+    {
+      "function": "shoulder_center",
+      "inputs": { "left_shoulder": [90, 900], "right_shoulder": [210, 940] },
+      "expected": [150, 920]
+    },
+    {
+      "function": "hip_height",
+      "inputs": { "left_hip": [100, 1500], "right_hip": [200, 1600], "reference_y": 2000 },
+      "expected": 450
+    },
+    {
+      "function": "torso_length",
+      "inputs": {
+        "left_shoulder": [90, 900],
+        "right_shoulder": [210, 940],
+        "left_hip": [100, 1500],
+        "right_hip": [200, 1600]
+      },
+      "expected": 630
+    },
+    {
+      "function": "torso_length",
+      "inputs": {
+        "left_shoulder": [40, 880],
+        "right_shoulder": [160, 920],
+        "left_hip": [100, 1500],
+        "right_hip": [220, 1660]
+      },
+      "expected": 682.6419266350405
+    },
+    {
+      "function": "relative_to",
+      "inputs": { "value": 450, "reference": 630 },
+      "expected": 0.7142857142857143
+    },
+    {
+      "function": "relative_to",
+      "inputs": { "value": 1, "reference": 0 },
+      "expected": null
+    },
+    {
+      "function": "cm_per_px",
+      "inputs": { "known_cm": 20, "measured_px": 100 },
+      "expected": 0.2
+    },
+    {
+      "function": "cm_per_px",
+      "inputs": { "known_cm": 178, "measured_px": 1424 },
+      "expected": 0.125
+    },
+    {
+      "function": "cm_per_px",
+      "inputs": { "known_cm": 178, "measured_px": 0 },
+      "expected": null
+    }
+  ]
+}
