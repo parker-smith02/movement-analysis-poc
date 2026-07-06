@@ -96,10 +96,15 @@ relative units are not just preferred there, they are FORCED. Aligns with the
 existing relative-units preference and the board→outdoor path.
 
 **POC implementation (variant D, cheap):** camera is static per take, so no
-tracking needed — one clicked reference-hold pixel coordinate per camera
-setup; recompute hip height above it; also gate ankle-based variants on a
-minimum usable-ankle-frame count. Status: approach approved 2026-07-06,
-implementation pending (next session).
+tracking needed — one clicked reference-hold pixel coordinate per take
+(refined from "per camera setup": static-reset requires per-take clicks
+anyway, and click repeatability is real product noise that belongs in the
+measured floor); recompute hip height above it; also gate ankle-based
+variants on a minimum usable-ankle-frame count (30 frames / 50% of core
+frames — gated 14 of 30 takes). Status: implemented 2026-07-06
+(`lab/pick_anchors.py` + variant D in `lab/exp02_noise_floor.py`); awaiting
+reference-hold clicks (`uv run lab/pick_anchors.py`) for the re-run that
+answers the units question.
 
 ---
 
