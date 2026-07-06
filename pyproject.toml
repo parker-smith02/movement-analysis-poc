@@ -1,0 +1,26 @@
+# torch comes from the pytorch.org cu118 index: PyPI Windows wheels are
+# CPU-only, and cu118 builds still include Pascal (sm_61) kernels for the
+# GTX 1080 used for the ViTPose upper-bound runs.
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu118" }
+
+[project]
+name = "movement-analysis-poc"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "accelerate>=1.14.0",
+    "matplotlib>=3.11.0",
+    "mediapipe>=0.10.35",
+    "numpy>=2.4.6",
+    "opencv-contrib-python>=5.0.0.93",
+    "pandas>=3.0.3",
+    "scipy>=1.17.1",
+    "torch>=2.7.1",
+    "transformers>=5.13.0",
+]
