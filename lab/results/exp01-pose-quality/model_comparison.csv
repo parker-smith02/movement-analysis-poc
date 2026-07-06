@@ -1,0 +1,11 @@
+clip,models,core_disagreement_median_px,frames_compared
+IMG_8060.mov,mediapipe vs vitpose,34.36962631317679,599
+IMG_9139.mov,mediapipe vs vitpose,19.61208720163212,980
+IMG_9184.mov,mediapipe vs vitpose,24.388123383254733,725
+IMG_9232.mov,mediapipe vs vitpose,22.27725232090459,250
+IMG_9233.mov,mediapipe vs vitpose,29.594919110346797,593
+daily.mov,mediapipe vs vitpose,32.43183620456548,305
+french-press.mov,mediapipe vs vitpose,26.986662502677284,276
+low-angle-crimps.mov,mediapipe vs vitpose,21.70252679521354,995
+rose-bloc-comp.MOV,mediapipe vs vitpose,20.33559907552395,981
+rose-bloc-slab.MOV,mediapipe vs vitpose,30.90707013391934,1955

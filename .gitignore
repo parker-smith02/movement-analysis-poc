@@ -1,0 +1,30 @@
+# Raw climbing footage — may contain identifiable people. Never commit video.
+footage/*
+!footage/.gitkeep
+!footage/manifest.csv
+
+# Video files anywhere in the repo (overlay renders, etc.)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.MP4
+*.MOV
+
+# Model weights
+lab/models/
+*.task
+
+# Raw landmark timeseries: large, derived, regenerable from local footage.
+# Summaries and plots in results/ ARE committed (the durable lab record).
+lab/results/**/landmarks/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.python-version.local
+
+# OS
+Thumbs.db
+desktop.ini
