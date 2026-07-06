@@ -101,10 +101,15 @@ tracking needed — one clicked reference-hold pixel coordinate per take
 anyway, and click repeatability is real product noise that belongs in the
 measured floor); recompute hip height above it; also gate ankle-based
 variants on a minimum usable-ankle-frame count (30 frames / 50% of core
-frames — gated 14 of 30 takes). Status: implemented 2026-07-06
-(`lab/pick_anchors.py` + variant D in `lab/exp02_noise_floor.py`); awaiting
-reference-hold clicks (`uv run lab/pick_anchors.py`) for the re-run that
-answers the units question.
+frames — gated 14 of 30 takes). Status: implemented AND run 2026-07-06
+(`lab/pick_anchors.py` + variant D in `lab/exp02_noise_floor.py`). Result:
+anchor concept validated — camera re-set translation absorbed (28.7 → 9.8 px)
+and movement-peak repeatability rescued on all 18 takes (142.7 → 12.3 px,
+including heel hooks) — but criterion 1 still fails (8 % torso) for two
+measured reasons: the clicked hold was ~2.6 torso-lengths from the hips
+(geometry residual scales with the lever arm) and the per-frame /torso ratio
+form doubles the noise. Next: re-click a near-working-zone hold + normalize
+once per take. See `lab/results/exp02-noise-floor/findings-hold-anchor.md`.
 
 ---
 

@@ -54,8 +54,7 @@ def load_anchors(path: Path) -> dict:
     if path.exists():
         return json.loads(path.read_text())
     return {
-        "hold_comment": "FILL IN: which physical hold was clicked, so future "
-                        "clips use the same one",
+        "hold_comment": "purple on top row",
         "anchors": {},
     }
 
