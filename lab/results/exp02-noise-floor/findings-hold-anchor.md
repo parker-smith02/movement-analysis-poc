@@ -41,10 +41,15 @@ Two separable causes, both measured:
    (clean ankles, body-anchored): 2.06 % ≈ 4.5 px — so roughly half of D's
    9.8 px is the camera chain, not the climber.
 
-For contrast, the same movement-peak data normalized ONCE per take
-(peak D_px ÷ take-median torso) pools to **2.72 % torso (df 12)** vs 10.5 %
-for the per-frame ratio form — the ratio form, not the anchor, is the bigger
-lever there.
+For contrast, the movement-peak **px** measurement itself is repeatable:
+12.3 px pooled ≈ **2.6 %** of the movement group's median torso (equivalently
+2.72 % when normalized by one torso shared within each move). But every
+honest per-take denominator inherits the amplification: per-frame ratio
+10.5 %, per-take median ratio **9.1 %**. (Correction 2026-07-07: an earlier
+version of this paragraph attributed 2.72 % to per-take normalization — that
+figure used a shared within-move denominator, which the product does not have
+across camera setups.) The denominator error × |D|/torso term, i.e. the
+anchor distance, dominates all ratio forms.
 
 ## Conclusion
 
@@ -66,10 +71,13 @@ not to pose quality (hips held at ~14 px all along).
    next.
 2. **Normalize once per take, not per frame**: report D_px ÷ take-median
    torso as the relative form (and peak-D_px ÷ take-median torso for moves).
-   Already supported by this run's numbers (8.0 % → 4.4 % static,
-   10.5 % → 2.7 % movement). Requires a small metric-definition change —
-   decide before the next run so criterion 1 is stated up front, not fitted
-   to the data.
+   DONE and pre-registered 2026-07-07 (criterion 1 restated in the script
+   docstring before the near-anchor data exists). Measured on the top-row
+   anchor it changes little by itself (static-reset 8.04 % → 8.15 %, movement
+   10.5 % → 9.1 %) — as expected, since torso error × |D|/torso dominates
+   both forms at this anchor distance. It is kept because it is the form the
+   product would ship (one scale per attempt) and it removes per-frame
+   foreshortening noise once the amplification term shrinks.
 3. More static-reset takes. All static-reset stds here sit on **df = 2**; a
    pass/fail read at the 2 % bar deserves df ≥ 5 before the units decision is
    final.

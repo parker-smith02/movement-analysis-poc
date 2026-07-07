@@ -1,12 +1,12 @@
 # Test 2 — noise floor and calibration
-_Generated 2026-07-07 02:27 UTC from 30 takes._
+_Generated 2026-07-06 21:11 UTC from 30 takes._
 
 Between-take std (ddof=1) of per-take medians; the product's minimum
 honestly-reportable difference is **2×std**.
 
        group  n_takes  n_positions  std_A_px  std_B_px  std_C_torso  std_D_px  std_D_torso  std_C_pct_torso  std_D_pct_torso  std_B_pct_torso
-static-fixed        9            3    14.238    16.677        0.074    15.350        0.122            7.414           12.234            7.671
-static-reset        3            1    28.710     3.093        0.021     9.754        0.081            2.057            8.146            1.400
+static-fixed        9            3    14.238    16.677        0.074    15.350        0.116            7.414           11.626            7.671
+static-reset        3            1    28.710     3.093        0.021     9.754        0.080            2.057            8.037            1.400
 
 ## Data quality
 - Reference-hold anchors (variant D): 30/30 takes
@@ -17,18 +17,18 @@ static-reset        3            1    28.710     3.093        0.021     9.754   
 _6 move(s), 18 takes, pooled df=6._
 
  n_moves  n_takes  std_Bpeak_px  df_Bpeak_px  std_Cpeak_torso  df_Cpeak_torso  std_Dpeak_px  df_Dpeak_px  std_Dpeak_torso  df_Dpeak_torso  std_Bpeak_pct_torso  std_Cpeak_pct_torso  std_Dpeak_pct_torso
-       6       18       142.656            6            0.170               6        12.260           12            0.091              12               30.357               17.033                9.141
+       6       18       142.656            6            0.170               6        12.260           12            0.105              12               30.357               17.033               10.489
 
 ## Calibration
 _calibration.json not filled in — criterion 2 not evaluated._
 
-**Criterion 1 (σ of relative hip height, hold-anchored D/torso, static-reset, ≤2.0% torso):** 8.15% → FAIL _(ankle-anchored C on the same takes, for comparison: 2.06%)_
+**Criterion 1 (σ of relative hip height, hold-anchored D/torso, static-reset, ≤2.0% torso):** 8.04% → FAIL _(ankle-anchored C on the same takes, for comparison: 2.06%)_
 
 ## Minimum honestly reportable difference (2σ)
 
 - Within one camera setup (variant A, static-fixed): **28.5 px**
 - Across camera setups, hold-anchored (variant D, static-reset): **19.5 px**
-- Across camera setups, hold-anchored relative (D/torso, static-reset): **16.29% of torso length**
+- Across camera setups, hold-anchored relative (D/torso, static-reset): **16.07% of torso length**
 - Across camera setups, ankle-anchored (variant B, static-reset, gated): **6.2 px**
 - Across camera setups, ankle-anchored relative (variant C, static-reset, gated): **4.11% of torso length**
 

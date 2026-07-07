@@ -123,6 +123,9 @@ def main() -> int:
                         help="window height on screen (coords stay full-res)")
     parser.add_argument("--redo", nargs="*", default=[],
                         help="re-click these filenames even if already set")
+    parser.add_argument("--redo-all", action="store_true",
+                        help="re-click every take (e.g. moving the anchor to "
+                             "a different hold); update hold_comment after")
     args = parser.parse_args()
 
     takes_path = args.takes_dir / "takes.csv"
@@ -136,7 +139,8 @@ def main() -> int:
     data = load_anchors(anchors_path)
     anchors = data["anchors"]
 
-    todo = [f for f in filenames if f in args.redo or f not in anchors]
+    todo = [f for f in filenames
+            if args.redo_all or f in args.redo or f not in anchors]
     if not todo:
         print(f"all {len(filenames)} takes already have anchor entries in "
               f"{anchors_path.name} (use --redo <filename> to re-click)")

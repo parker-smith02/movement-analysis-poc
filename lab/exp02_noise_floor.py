@@ -6,11 +6,23 @@ climbing-relevant differences (~5 cm / ~10% of torso length) clear it, and
 the two pixel->cm calibration methods agree.
 
 Pass criteria (judgment calls, stated up front):
-  1. Between-take std of relative hip height (variant D/torso, static-reset
-     group) <= 2% of torso length. The product's minimum reportable difference
+  1. Between-take std of relative hip height (variant D, static-reset group)
+     <= 2% of torso length, where relative hip height = per-take median D_px
+     / per-take median torso_px. The product's minimum reportable difference
      is 2 sigma; 2% keeps that at ~2 cm-equivalent for a typical adult torso.
-     (Run 1 evaluated this on variant C; re-anchored to D after the ankle
-     anchor failed — see results/exp02-noise-floor/findings-anchor.md.)
+     Definition history (each restated BEFORE the run that tests it):
+       run 1  per-frame C ratio (ankle anchor) — anchor rejected,
+              see results/exp02-noise-floor/findings-anchor.md
+       run 2  per-frame D ratio (top-row hold) — ratio noise is dominated by
+              torso error x |D|/torso (corr(|D|, torso) = -0.90 across
+              re-sets); with the far anchor |D| ~ 2.6 torsos, so NO ratio
+              form can pass until the anchor is near the working zone.
+              See findings-hold-anchor.md.
+       now    per-take medians ratio, as above — pre-registered as the form
+              the product would ship (one scale per attempt, not per frame).
+              NOT expected to fix the far-anchor numbers by itself (measured
+              on the top-row anchor: static-reset 8.15%, movement peaks
+              9.1%); the near-anchor re-click is the decisive lever.
   2. Person-height and hold-spacing calibrations agree within 5%.
 Failing (1) on static-reset but passing on static-fixed = camera setup, not
 pose, is the bottleneck -> filming guidance + relative units. Failing (2) ->
@@ -30,8 +42,12 @@ Four hip-height variants per take (the comparison IS the abs-vs-rel decision):
                                       single point corrects translation only:
                                       rotation/scale residual from tripod
                                       re-sets stays in the D floor by design
-                                      (it is real product noise). D/torso is
-                                      the relative form.
+                                      (it is real product noise). Relative
+                                      form: per-take median D / per-take
+                                      median torso (NOT per frame — see
+                                      criterion 1 note above). The residual
+                                      scales with the anchor->hip distance,
+                                      so prefer a hold near the working zone.
 
 Ankle gating (judgment calls): variants B/C are NaN'd for takes with
 frames_ankles < MIN_ANKLE_FRAMES (~1 s of video) or an ankle-usable fraction
@@ -164,7 +180,7 @@ def analyze_take(csv_path: Path, anchor_y: float | None = None) -> dict:
         axis=1,
     )
 
-    a_vals, b_vals, c_vals, d_vals, dt_vals, torso_vals = [], [], [], [], [], []
+    a_vals, b_vals, c_vals, d_vals, torso_vals = [], [], [], [], []
     for idx in range(len(df)):
         if not core_ok[idx]:
             continue
@@ -173,9 +189,8 @@ def analyze_take(csv_path: Path, anchor_y: float | None = None) -> dict:
         torso_vals.append(torso)
         a_vals.append(metrics.hip_height(p["l_hip"], p["r_hip"], reference_y=h))
         if anchor_y is not None:
-            d = metrics.hip_height(p["l_hip"], p["r_hip"], reference_y=anchor_y)
-            d_vals.append(d)
-            dt_vals.append(metrics.relative_to(d, torso))
+            d_vals.append(metrics.hip_height(p["l_hip"], p["r_hip"],
+                                             reference_y=anchor_y))
         if ankles_ok[idx]:
             ankle_mid_y = metrics.midpoint(p["l_ank"], p["r_ank"])[1]
             b = metrics.hip_height(p["l_hip"], p["r_hip"], reference_y=ankle_mid_y)
@@ -188,6 +203,12 @@ def analyze_take(csv_path: Path, anchor_y: float | None = None) -> dict:
     if ankle_gated:
         b_vals, c_vals = [], []  # too few ankle frames to trust the medians
 
+    torso_med = float(np.median(torso_vals)) if torso_vals else np.nan
+    d_med = float(np.median(d_vals)) if d_vals else np.nan
+    # peak (95th pct): the move-shaped quantity for movement takes —
+    # a repeated identical move should reach the same highest hip point
+    d_peak = float(np.percentile(d_vals, 95)) if d_vals else np.nan
+
     return {
         "frames": len(df),
         "frames_core": n_core,
@@ -197,15 +218,14 @@ def analyze_take(csv_path: Path, anchor_y: float | None = None) -> dict:
         "hipA_within_std": float(np.std(a_vals)) if a_vals else np.nan,
         "hipB_px": float(np.median(b_vals)) if b_vals else np.nan,
         "hipC_torso": float(np.median(c_vals)) if c_vals else np.nan,
-        "hipD_px": float(np.median(d_vals)) if d_vals else np.nan,
-        "hipD_torso": float(np.median(dt_vals)) if dt_vals else np.nan,
-        # peak (95th pct): the move-shaped quantity for movement takes —
-        # a repeated identical move should reach the same highest hip point
+        "hipD_px": d_med,
+        # D relative form: one scale per take (median torso), not per frame
+        "hipD_torso": metrics.relative_to(d_med, torso_med),
         "hipB_peak_px": float(np.percentile(b_vals, 95)) if b_vals else np.nan,
         "hipC_peak_torso": float(np.percentile(c_vals, 95)) if c_vals else np.nan,
-        "hipD_peak_px": float(np.percentile(d_vals, 95)) if d_vals else np.nan,
-        "hipD_peak_torso": float(np.percentile(dt_vals, 95)) if dt_vals else np.nan,
-        "torso_px": float(np.median(torso_vals)) if torso_vals else np.nan,
+        "hipD_peak_px": d_peak,
+        "hipD_peak_torso": metrics.relative_to(d_peak, torso_med),
+        "torso_px": torso_med,
         "_series": {"A": a_vals, "B": b_vals, "C": c_vals, "D": d_vals},
     }
 
