@@ -96,10 +96,44 @@ relative units are not just preferred there, they are FORCED. Aligns with the
 existing relative-units preference and the board→outdoor path.
 
 **POC implementation (variant D, cheap):** camera is static per take, so no
-tracking needed — one clicked reference-hold pixel coordinate per camera
-setup; recompute hip height above it; also gate ankle-based variants on a
-minimum usable-ankle-frame count. Status: approach approved 2026-07-06,
-implementation pending (next session).
+tracking needed — one clicked reference-hold pixel coordinate per take
+(refined from "per camera setup": static-reset requires per-take clicks
+anyway, and click repeatability is real product noise that belongs in the
+measured floor); recompute hip height above it; also gate ankle-based
+variants on a minimum usable-ankle-frame count (30 frames / 50% of core
+frames — gated 14 of 30 takes). Status: implemented AND run 2026-07-06
+(`lab/pick_anchors.py` + variant D in `lab/exp02_noise_floor.py`). Result:
+anchor concept validated — camera re-set translation absorbed (28.7 → 9.8 px)
+and movement-peak repeatability rescued on all 18 takes (142.7 → 12.3 px,
+including heel hooks) — but run-2 criterion 1 still failed (8 % torso) because
+the clicked hold was ~2.6 torso-lengths from the hips and the /torso ratio
+amplifies that lever arm. Run 3 (2026-07-07) re-clicked a near-hip hold: the
+amplification collapsed as predicted (ratio floor now equals px floor) and the
+relative floor roughly halved — static-reset D/torso 8.15 % → **3.18 %**,
+movement peaks 9.1 % → **3.63 %**. Still above the aspirational 2 % bar; the
+residual is now isolated as camera-re-set rotation/scale (world-fixed hold
+7.0 px vs body-fixed ankle 3.1 px on the same clean static-reset takes — a
+single-point anchor corrects translation only). **Net product read:** with a
+near anchor the honest floor is ~3–3.6 % torso, so 2σ ≈ ~3.5 cm; the target
+insights (~8 cm ≈ 16 % torso) clear that with margin, so relative units are
+viable. Two regimes to ship: within-camera-setup (tripod untouched → tighter,
+variant A suffices) and cross-setup (~3.2 %, needs a two-point anchor to beat
+2 %). See `lab/results/exp02-noise-floor/findings-hold-anchor.md` run-3
+section. Remaining before a final call: more static-reset takes (df=2) and,
+if cross-setup <2 % is wanted, a two-point (scale+rotation) anchor.
+
+**exp03 update (2026-07-07): the background-registration idea above is now
+measured and it wins.** Zero-tap SIFT+RANSAC homography registers re-set
+takes to ~1–2 px on the wall plane (probe-evaluated); similarity (and hence
+any 2-tap scheme) fails at ~8 px because tripod re-sets change perspective;
+translation-only fails at distance (20 px at a 580 px lever). Two
+consequences: (a) **registration subsumes anchoring for diff mode** — once
+two attempts share a coordinate frame, attempt-vs-attempt deltas need no
+anchor tap at all; the clicked hold survives only for "position vs wall
+landmark" language. (b) The static-hold lab floors (3.18 %, 6.3 %) are
+dominated by the climber's own position reproduction, not the pipeline —
+measurement error is ~1.6 % torso (2σ ≈ 3.3 %), and body reproduction is
+signal in the product. See `lab/results/exp03-registration/findings.md`.
 
 ---
 

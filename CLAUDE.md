@@ -63,6 +63,22 @@ board (Kilter/Tension grid) visible in frame.
 **Fallback if calibration is unreliable:** report relative differences ("hips 12% higher
 relative to reach span") — decide which world we're in before designing insight language.
 
+**DECIDED (2026-07-07) — see `lab/DECISIONS.md`:**
+- **Units: RELATIVE** (fraction of torso length, normalized once per attempt). Reasons:
+  morphology-invariance, outdoor has no scale, perspective makes a single pixels→cm factor
+  wrong on an oblique wall, and the noise floor is comfortably below target insights.
+  Absolute cm is deferred, not forbidden (if ever wanted, do a homography onto a known board
+  hold-grid, not a single clicked scale).
+- **Measurement floor: 2σ ≈ 3.3% of torso** for a hip-height delta (≈ ~1.6 cm). This is the
+  minimum honestly-reportable difference; rank insights by delta ÷ floor.
+- **Cross-attempt coordinate frame: automatic background homography registration** (SIFT/ORB
+  on the wall, climber masked, RANSAC homography). Registers tripod re-sets to ~1% of torso —
+  as good as not moving the camera. **This subsumes anchoring for diff mode: attempt-vs-
+  attempt deltas need zero user taps.** A clicked anchor is only for phrasing a single attempt
+  against a named wall landmark.
+- Calibration (b) / `calibration.json`: left as an unfilled template on purpose — Criterion 2
+  cannot change the units decision. Not a blocker.
+
 ### Test 3 — Automatic attempt alignment
 Given 5–10 pairs of attempts at the same move, find the corresponding moment across them.
 Candidate approaches: cross-correlation of COM velocity profiles; detecting the frame where
@@ -94,6 +110,12 @@ numbers ──► [3. insights] ──► ranked statements with confidence labe
 Keep layers strictly separated. Layer 2 is the durable asset — it survives unchanged into
 the real app. Duplicating layer 2 in Python and TypeScript is deliberate: it forces a
 precise spec. Layer 3 stays hand-written/rule-based in the POC.
+
+**Layer 1 also owns cross-attempt registration** (Test 2 result, `lab/DECISIONS.md` D2):
+before metrics run, two attempts are brought into one wall-fixed coordinate frame via
+automatic background homography (SIFT/ORB features on the wall, climber masked, RANSAC).
+Layer 2 then works in shared wall coordinates, so position deltas are camera-independent
+with no user input. Pure metric functions are unchanged by this — it is upstream plumbing.
 
 ### v1 metric set (chosen for pose-reliability, not ambition)
 - Shoulder elevation (shoulder-to-ear geometry; the most detectable, validated by the
@@ -153,7 +175,10 @@ in Dart.
   from attempt 2 onward). The project (named move + attempt history) is the app's
   organizing object.
 - Filming guidance is a first-class feature: side-on for hip distance; warn on angles that
-  won't support tracking.
+  won't support tracking. Also: **pause a beat after touching the phone before the attempt**
+  (mount settling / phone stabilization drifts the view a few px for the first seconds —
+  measured in exp03); tripod need not stay perfectly put between attempts since registration
+  handles re-sets, but leaving it roughly in place helps.
 
 ## Board climbing context
 
@@ -198,8 +223,13 @@ tagging is nominative fair use territory; no logos, no implied endorsement.
 
 ## Sequencing
 
-1. Lab: Test 1 (pose quality) + upper-bound model comparison.
+1. Lab: Test 1 (pose quality) + upper-bound model comparison. ✅ done.
 2. Lab: Test 2 (noise floor, calibration). → Decision point: absolute cm vs. relative units.
-3. Lab: Test 3 (alignment) — timeboxed; fall back to manual alignment if it drags.
+   ✅ done — **RELATIVE units** chosen; measurement floor 2σ ≈ 3.3% torso; registration solves
+   cross-attempt alignment of coordinates. See `lab/DECISIONS.md` (D1, D2). Calibration (2b)
+   deferred by design.
+3. Lab: Test 3 (alignment) — timeboxed; fall back to manual alignment if it drags. ← NEXT.
+   Head start: registration (D2) already shares a coordinate frame across attempts, which
+   should make COM-velocity cross-correlation cleaner than on raw pixels.
 4. Demo: minimal side-by-side UI as the vehicle for Test 4 with real climbers.
 5. Commit/kill decision: lab numbers hold AND ≥2/4 climbers pass Test 4 → build the app.

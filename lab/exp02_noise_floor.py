@@ -6,23 +6,60 @@ climbing-relevant differences (~5 cm / ~10% of torso length) clear it, and
 the two pixel->cm calibration methods agree.
 
 Pass criteria (judgment calls, stated up front):
-  1. Between-take std of relative hip height (variant C, static-reset group)
-     <= 2% of torso length. The product's minimum reportable difference is
-     2 sigma; 2% keeps that at ~2 cm-equivalent for a typical adult torso.
+  1. Between-take std of relative hip height (variant D, static-reset group)
+     <= 2% of torso length, where relative hip height = per-take median D_px
+     / per-take median torso_px. The product's minimum reportable difference
+     is 2 sigma; 2% keeps that at ~2 cm-equivalent for a typical adult torso.
+     Definition history (each restated BEFORE the run that tests it):
+       run 1  per-frame C ratio (ankle anchor) — anchor rejected,
+              see results/exp02-noise-floor/findings-anchor.md
+       run 2  per-frame D ratio (top-row hold) — ratio noise is dominated by
+              torso error x |D|/torso (corr(|D|, torso) = -0.90 across
+              re-sets); with the far anchor |D| ~ 2.6 torsos, so NO ratio
+              form can pass until the anchor is near the working zone.
+              See findings-hold-anchor.md.
+       now    per-take medians ratio, as above — pre-registered as the form
+              the product would ship (one scale per attempt, not per frame).
+              NOT expected to fix the far-anchor numbers by itself (measured
+              on the top-row anchor: static-reset 8.15%, movement peaks
+              9.1%); the near-anchor re-click is the decisive lever.
   2. Person-height and hold-spacing calibrations agree within 5%.
 Failing (1) on static-reset but passing on static-fixed = camera setup, not
 pose, is the bottleneck -> filming guidance + relative units. Failing (2) ->
 relative units only (already Parker's preference for morphology reasons).
 
-Three hip-height variants per take (the comparison IS the abs-vs-rel decision):
+Four hip-height variants per take (the comparison IS the abs-vs-rel decision):
   A  hips above frame bottom, px    — valid only within one camera setup
-  B  hips above ankle midpoint, px  — wall-anchored (feet on same holds),
-                                      survives camera re-sets; cm via calibration
-  C  B / torso length               — camera- and morphology-relative
+  B  hips above ankle midpoint, px  — body-anchored; REJECTED as the primary
+                                      anchor (run 1: compressed poses collapse
+                                      the lower legs, heel hooks invert the
+                                      geometry, reaches occlude the feet);
+                                      kept, gated, for comparison
+  C  B / torso length               — relative form of B, same gating
+  D  hips above a clicked reference-hold pixel (anchors.json), px
+                                    — world-fixed anchor; camera is static per
+                                      take so one click per take suffices. A
+                                      single point corrects translation only:
+                                      rotation/scale residual from tripod
+                                      re-sets stays in the D floor by design
+                                      (it is real product noise). Relative
+                                      form: per-take median D / per-take
+                                      median torso (NOT per frame — see
+                                      criterion 1 note above). The residual
+                                      scales with the anchor->hip distance,
+                                      so prefer a hold near the working zone.
+
+Ankle gating (judgment calls): variants B/C are NaN'd for takes with
+frames_ankles < MIN_ANKLE_FRAMES (~1 s of video) or an ankle-usable fraction
+of core frames < MIN_ANKLE_COVERAGE — a 9-frame median must not be pooled
+like a 700-frame one. Gating does NOT catch semantically-broken-but-tracked
+cases (heel hooks); those stay documented in findings-anchor.md.
 
 Inputs:
   footage/exp02/takes.csv          filename, group, notes
                                    groups: static-fixed | static-reset | movement
+  footage/exp02/anchors.json       reference-hold pixel per take, clicked via:
+    uv run lab/pick_anchors.py
   footage/exp02/calibration.json   optional; see CAL_TEMPLATE below
   landmarks extracted via:
     uv run lab/extract_pose_mediapipe.py footage/exp02 --out lab/results/exp02-noise-floor/landmarks
@@ -61,6 +98,7 @@ ROOT = Path(__file__).parent.parent
 EXP02_DIR = ROOT / "footage" / "exp02"
 TAKES_PATH = EXP02_DIR / "takes.csv"
 CAL_PATH = EXP02_DIR / "calibration.json"
+ANCHORS_PATH = EXP02_DIR / "anchors.json"
 RESULTS_DIR = Path(__file__).parent / "results" / "exp02-noise-floor"
 LANDMARKS_DIR = RESULTS_DIR / "landmarks"
 PLOTS_DIR = RESULTS_DIR / "plots"
@@ -68,8 +106,10 @@ PLOTS_DIR = RESULTS_DIR / "plots"
 CONF = 0.5              # visibility threshold for usable frames
 GROUPS = ("static-fixed", "static-reset", "movement")
 TAKES_COLUMNS = ["filename", "group", "move_id", "notes"]
-PASS_REL_STD_PCT = 2.0  # criterion 1: sigma_C (static-reset) as % of torso
+PASS_REL_STD_PCT = 2.0  # criterion 1: sigma_D/torso (static-reset) as % of torso
 PASS_CAL_AGREE_PCT = 5.0  # criterion 2
+MIN_ANKLE_FRAMES = 30   # gate B/C: need >= ~1 s of usable-ankle frames ...
+MIN_ANKLE_COVERAGE = 0.5  # ... covering >= half the core-usable frames
 
 CAL_TEMPLATE = {
     "climber_height_cm": None,
@@ -109,7 +149,8 @@ Then:
   1. fill footage/exp02/takes.csv  (filename, group, move_id, notes)
   2. uv run lab/extract_pose_mediapipe.py footage/exp02 --out lab/results/exp02-noise-floor/landmarks
   3. uv run lab/pick_points.py <calibration clip>   -> paste px coords into calibration.json
-  4. uv run lab/exp02_noise_floor.py
+  4. uv run lab/pick_anchors.py   -> click the reference hold in every take (variant D)
+  5. uv run lab/exp02_noise_floor.py
 """
 
 
@@ -124,7 +165,7 @@ def frame_points(df: pd.DataFrame, idx: int, w: int, h: int) -> dict[str, metric
     }
 
 
-def analyze_take(csv_path: Path) -> dict:
+def analyze_take(csv_path: Path, anchor_y: float | None = None) -> dict:
     df, meta = read_landmarks(csv_path)
     w, h = meta["width"], meta["height"]
 
@@ -139,7 +180,7 @@ def analyze_take(csv_path: Path) -> dict:
         axis=1,
     )
 
-    a_vals, b_vals, c_vals, torso_vals = [], [], [], []
+    a_vals, b_vals, c_vals, d_vals, torso_vals = [], [], [], [], []
     for idx in range(len(df)):
         if not core_ok[idx]:
             continue
@@ -147,26 +188,45 @@ def analyze_take(csv_path: Path) -> dict:
         torso = metrics.torso_length(p["l_sh"], p["r_sh"], p["l_hip"], p["r_hip"])
         torso_vals.append(torso)
         a_vals.append(metrics.hip_height(p["l_hip"], p["r_hip"], reference_y=h))
+        if anchor_y is not None:
+            d_vals.append(metrics.hip_height(p["l_hip"], p["r_hip"],
+                                             reference_y=anchor_y))
         if ankles_ok[idx]:
             ankle_mid_y = metrics.midpoint(p["l_ank"], p["r_ank"])[1]
             b = metrics.hip_height(p["l_hip"], p["r_hip"], reference_y=ankle_mid_y)
             b_vals.append(b)
             c_vals.append(metrics.relative_to(b, torso))
 
+    n_core, n_ankles = int(core_ok.sum()), int(ankles_ok.sum())
+    ankle_gated = n_ankles < MIN_ANKLE_FRAMES or (
+        n_core > 0 and n_ankles / n_core < MIN_ANKLE_COVERAGE)
+    if ankle_gated:
+        b_vals, c_vals = [], []  # too few ankle frames to trust the medians
+
+    torso_med = float(np.median(torso_vals)) if torso_vals else np.nan
+    d_med = float(np.median(d_vals)) if d_vals else np.nan
+    # peak (95th pct): the move-shaped quantity for movement takes —
+    # a repeated identical move should reach the same highest hip point
+    d_peak = float(np.percentile(d_vals, 95)) if d_vals else np.nan
+
     return {
         "frames": len(df),
-        "frames_core": int(core_ok.sum()),
-        "frames_ankles": int(ankles_ok.sum()),
+        "frames_core": n_core,
+        "frames_ankles": n_ankles,
+        "ankle_gated": ankle_gated,
         "hipA_px": float(np.median(a_vals)) if a_vals else np.nan,
         "hipA_within_std": float(np.std(a_vals)) if a_vals else np.nan,
         "hipB_px": float(np.median(b_vals)) if b_vals else np.nan,
         "hipC_torso": float(np.median(c_vals)) if c_vals else np.nan,
-        # peak (95th pct): the move-shaped quantity for movement takes —
-        # a repeated identical move should reach the same highest hip point
+        "hipD_px": d_med,
+        # D relative form: one scale per take (median torso), not per frame
+        "hipD_torso": metrics.relative_to(d_med, torso_med),
         "hipB_peak_px": float(np.percentile(b_vals, 95)) if b_vals else np.nan,
         "hipC_peak_torso": float(np.percentile(c_vals, 95)) if c_vals else np.nan,
-        "torso_px": float(np.median(torso_vals)) if torso_vals else np.nan,
-        "_series": {"A": a_vals, "B": b_vals, "C": c_vals},
+        "hipD_peak_px": d_peak,
+        "hipD_peak_torso": metrics.relative_to(d_peak, torso_med),
+        "torso_px": torso_med,
+        "_series": {"A": a_vals, "B": b_vals, "C": c_vals, "D": d_vals},
     }
 
 
@@ -248,6 +308,8 @@ def plot_takes(summary: pd.DataFrame, series: dict[str, dict], variant: str,
         colors.append(palette.get(row["group"], "gray"))
     if not data:
         plt.close(fig)
+        # a variant with no data must not leave a stale plot from a prior run
+        (PLOTS_DIR / f"takes_{variant}.png").unlink(missing_ok=True)
         return
     bp = ax.boxplot(data, tick_labels=names, showfliers=False, patch_artist=True)
     for patch, color in zip(bp["boxes"], colors):
@@ -301,26 +363,41 @@ def main() -> int:
               "--out lab/results/exp02-noise-floor/landmarks")
         return 1
 
+    # world-fixed reference-hold anchors (variant D), clicked per take
+    anchors: dict = {}
+    if ANCHORS_PATH.exists():
+        anchors = json.loads(ANCHORS_PATH.read_text()).get("anchors", {})
+    else:
+        print(f"no {ANCHORS_PATH.name} — variant D (hold-anchored) skipped; "
+              "run: uv run lab/pick_anchors.py")
+    no_anchor = [f for f in analysis_takes["filename"] if not anchors.get(f)]
+    if anchors and no_anchor:
+        print(f"takes without a usable anchor (variant D = NaN): {no_anchor}")
+
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     rows, series = [], {}
     for _, t in analysis_takes.iterrows():
         csv_path = landmarks_csv_path(LANDMARKS_DIR, EXP02_DIR / t["filename"],
                                       "mediapipe")
-        result = analyze_take(csv_path)
+        anchor = anchors.get(t["filename"])
+        result = analyze_take(csv_path,
+                              float(anchor["px"][1]) if anchor else None)
         series[t["filename"]] = result.pop("_series")
         rows.append({"filename": t["filename"], "group": t["group"],
                      "move_id": t["move_id"], **result})
         print(f"{t['filename']} [{t['group']}]  "
               f"hipA={result['hipA_px']:.0f}px  hipB={result['hipB_px']:.0f}px  "
-              f"hipC={result['hipC_torso']:.3f}torso  "
+              f"hipD={result['hipD_px']:.0f}px  "
               f"usable core/ankles: {result['frames_core']}/{result['frames_ankles']}"
-              f" of {result['frames']}")
+              f" of {result['frames']}"
+              + ("  [B/C GATED]" if result["ankle_gated"] else ""))
 
     summary = pd.DataFrame(rows)
     summary.to_csv(RESULTS_DIR / "takes_summary.csv", index=False)
     for variant, label in (("A", "px above frame bottom"),
                            ("B", "px above ankle midpoint"),
-                           ("C", "fraction of torso length")):
+                           ("C", "fraction of torso length"),
+                           ("D", "px above reference hold")):
         plot_takes(summary, series, variant, label)
 
     cal = load_calibration()
@@ -343,13 +420,16 @@ def main() -> int:
         row: dict = {"group": group, "n_takes": len(g),
                      "n_positions": g["move_id"].nunique()}
         for col, name in (("hipA_px", "A_px"), ("hipB_px", "B_px"),
-                          ("hipC_torso", "C_torso")):
+                          ("hipC_torso", "C_torso"), ("hipD_px", "D_px"),
+                          ("hipD_torso", "D_torso")):
             std, _ = pooled_std([sub[col].to_numpy() for sub in by_pos])
             row[f"std_{name}"] = std
         torso = float(g["torso_px"].median())
         row["std_C_pct_torso"] = row["std_C_torso"] * 100
+        row["std_D_pct_torso"] = row["std_D_torso"] * 100
         row["std_B_pct_torso"] = row["std_B_px"] / torso * 100 if torso else np.nan
         row.update(cm_columns("std_B", row["std_B_px"]))
+        row.update(cm_columns("std_D", row["std_D_px"]))
         noise_rows.append(row)
     noise = pd.DataFrame(noise_rows)
     noise.to_csv(RESULTS_DIR / "noise_floor.csv", index=False)
@@ -363,7 +443,9 @@ def main() -> int:
         by_move = [g for _, g in mvt.groupby("move_id")]
         mrow: dict = {"n_moves": mvt["move_id"].nunique(), "n_takes": len(mvt)}
         for col, name in (("hipB_peak_px", "Bpeak_px"),
-                          ("hipC_peak_torso", "Cpeak_torso")):
+                          ("hipC_peak_torso", "Cpeak_torso"),
+                          ("hipD_peak_px", "Dpeak_px"),
+                          ("hipD_peak_torso", "Dpeak_torso")):
             std, df = pooled_std([g[col].to_numpy() for g in by_move])
             mrow[f"std_{name}"] = std
             mrow[f"df_{name}"] = df
@@ -371,7 +453,9 @@ def main() -> int:
         mrow["std_Bpeak_pct_torso"] = (mrow["std_Bpeak_px"] / torso * 100
                                        if torso else np.nan)
         mrow["std_Cpeak_pct_torso"] = mrow["std_Cpeak_torso"] * 100
+        mrow["std_Dpeak_pct_torso"] = mrow["std_Dpeak_torso"] * 100
         mrow.update(cm_columns("std_Bpeak", mrow["std_Bpeak_px"]))
+        mrow.update(cm_columns("std_Dpeak", mrow["std_Dpeak_px"]))
         movement = pd.DataFrame([mrow])
         movement.to_csv(RESULTS_DIR / "movement_noise.csv", index=False)
 
@@ -387,6 +471,28 @@ def main() -> int:
         noise.to_string(index=False, float_format=lambda v: f"{v:.3f}"),
         "",
     ]
+
+    # ---- data quality: anchor coverage, ankle gating, A-vs-D cross-check ----
+    n_anchor = sum(1 for f in analysis_takes["filename"] if anchors.get(f))
+    gated_names = summary[summary["ankle_gated"]]["filename"].tolist()
+    parts += [
+        "## Data quality",
+        f"- Reference-hold anchors (variant D): {n_anchor}/{len(summary)} takes"
+        + (f"; missing: {', '.join(no_anchor)}" if no_anchor else ""),
+        f"- Ankle-gated takes (B/C = NaN; <{MIN_ANKLE_FRAMES} usable-ankle "
+        f"frames or <{MIN_ANKLE_COVERAGE:.0%} of core frames): "
+        f"{len(gated_names)}/{len(summary)}"
+        + (f" — {', '.join(gated_names)}" if gated_names else ""),
+    ]
+    fixed_dq = noise[noise["group"] == "static-fixed"]
+    if len(fixed_dq) and not np.isnan(fixed_dq["std_D_px"].iat[0]):
+        parts += [
+            f"- static-fixed cross-check: std_D {fixed_dq['std_D_px'].iat[0]:.1f} px "
+            f"vs std_A {fixed_dq['std_A_px'].iat[0]:.1f} px — the camera is "
+            "untouched within this group, so the difference isolates anchor-click "
+            "noise."
+        ]
+    parts += [""]
     if movement is not None:
         parts += [
             "## Movement repeatability (peak hip height, pooled within-move)",
@@ -422,15 +528,20 @@ def main() -> int:
     reset = noise[noise["group"] == "static-reset"]
     fixed = noise[noise["group"] == "static-fixed"]
     crit1_pass = None
-    if len(reset) and not np.isnan(reset["std_C_pct_torso"].iat[0]):
-        v = reset["std_C_pct_torso"].iat[0]
+    if len(reset) and not np.isnan(reset["std_D_pct_torso"].iat[0]):
+        v = reset["std_D_pct_torso"].iat[0]
         crit1_pass = v <= PASS_REL_STD_PCT
-        parts += [f"**Criterion 1 (σ of relative hip height, static-reset, "
-                  f"≤{PASS_REL_STD_PCT}% torso):** {v:.2f}% → "
-                  f"{'PASS' if crit1_pass else 'FAIL'}", ""]
+        line = (f"**Criterion 1 (σ of relative hip height, hold-anchored "
+                f"D/torso, static-reset, ≤{PASS_REL_STD_PCT}% torso):** "
+                f"{v:.2f}% → {'PASS' if crit1_pass else 'FAIL'}")
+        if not np.isnan(reset["std_C_pct_torso"].iat[0]):
+            line += (f" _(ankle-anchored C on the same takes, for comparison: "
+                     f"{reset['std_C_pct_torso'].iat[0]:.2f}%)_")
+        parts += [line, ""]
     else:
-        parts += ["**Criterion 1:** not evaluable — need ≥2 static-reset takes "
-                  "with usable ankle frames.", ""]
+        parts += ["**Criterion 1:** not evaluable — variant D needs "
+                  "reference-hold anchors on ≥2 static-reset takes "
+                  "(run: uv run lab/pick_anchors.py).", ""]
 
     # ---- minimum honestly reportable difference (2σ), per unit system ----
     parts += ["## Minimum honestly reportable difference (2σ)", ""]
@@ -439,38 +550,53 @@ def main() -> int:
                   f"**{2 * fixed['std_A_px'].iat[0]:.1f} px**"]
     if len(reset):
         r = reset.iloc[0]
+        if not np.isnan(r["std_D_px"]):
+            line = (f"- Across camera setups, hold-anchored (variant D, "
+                    f"static-reset): **{2 * r['std_D_px']:.1f} px**")
+            if scales:
+                cms = [f"{2 * r['std_D_px'] * s:.2f} cm ({name})"
+                       for name, s in scales.items()]
+                line += " = " + " / ".join(cms)
+            parts += [line]
+        if not np.isnan(r["std_D_pct_torso"]):
+            parts += [f"- Across camera setups, hold-anchored relative "
+                      f"(D/torso, static-reset): "
+                      f"**{2 * r['std_D_pct_torso']:.2f}% of torso length**"]
         if not np.isnan(r["std_B_px"]):
-            line = (f"- Across camera setups, wall-anchored (variant B, "
-                    f"static-reset): **{2 * r['std_B_px']:.1f} px**")
+            line = (f"- Across camera setups, ankle-anchored (variant B, "
+                    f"static-reset, gated): **{2 * r['std_B_px']:.1f} px**")
             if scales:
                 cms = [f"{2 * r['std_B_px'] * s:.2f} cm ({name})"
                        for name, s in scales.items()]
                 line += " = " + " / ".join(cms)
             parts += [line]
         if not np.isnan(r["std_C_pct_torso"]):
-            parts += [f"- Across camera setups, relative (variant C, "
-                      f"static-reset): **{2 * r['std_C_pct_torso']:.2f}% of "
-                      f"torso length**"]
+            parts += [f"- Across camera setups, ankle-anchored relative "
+                      f"(variant C, static-reset, gated): "
+                      f"**{2 * r['std_C_pct_torso']:.2f}% of torso length**"]
     parts += [""]
 
     # ---- units decision input (the point of Test 2 per CLAUDE.md) ----
     cal_ok = bool(cal) and cal.get("max_disagreement_pct") is not None \
         and cal["max_disagreement_pct"] <= PASS_CAL_AGREE_PCT
     if crit1_pass is None:
-        rec = "_Not enough data for a units recommendation yet._"
+        rec = ("_Not enough data for a units recommendation yet — variant D "
+               "needs reference-hold anchors (uv run lab/pick_anchors.py)._")
     elif cal_ok and crit1_pass:
         rec = ("Both worlds are open: calibration is consistent and the "
-               "relative floor passes. Relative units remain the default "
-               "(morphology-invariant, no calibration step in the product); "
-               "absolute cm is available where a calibration reference exists.")
+               "hold-anchored relative floor passes. Relative units remain "
+               "the default (morphology-invariant, no calibration step in "
+               "the product); absolute cm is available where a calibration "
+               "reference exists.")
     elif crit1_pass:
-        rec = ("Relative units only: the relative noise floor passes but "
-               "calibration is missing or unreliable, so absolute cm claims "
-               "are not honest yet.")
+        rec = ("Relative units only: the hold-anchored relative noise floor "
+               "passes but calibration is missing or unreliable, so absolute "
+               "cm claims are not honest yet.")
     else:
-        rec = ("Neither unit system clears the bar — investigate the noise "
-               "sources (ankle visibility? camera protocol?) before designing "
-               "insight language.")
+        rec = ("Neither unit system clears the bar even with a world-fixed "
+               "anchor — investigate the remaining noise sources (anchor-click "
+               "repeatability? camera rotation/scale between re-sets? hip "
+               "tracking itself?) before designing insight language.")
     parts += ["## Units decision (recommendation — final call is the developer's)",
               "", rec, ""]
 

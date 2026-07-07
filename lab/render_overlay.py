@@ -9,6 +9,10 @@ Usage:
     uv run lab/render_overlay.py                    # all extracted clips
     uv run lab/render_overlay.py clip.mp4           # specific clip(s)
     uv run lab/render_overlay.py --model mediapipe  # which extraction to draw
+    uv run lab/render_overlay.py --anchors footage/exp02/anchors.json
+        # also draw the clip's clicked reference-hold anchor (exp02 variant D)
+        # as a crosshair + horizontal line — eyeball that clicks landed on the
+        # same hold across takes
 
 Output: lab/results/exp01-pose-quality/overlays/<clip>_<model>_overlay.mp4
 (video files are gitignored repo-wide; overlays never leave the machine).
@@ -17,6 +21,7 @@ Output: lab/results/exp01-pose-quality/overlays/<clip>_<model>_overlay.mp4
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -57,6 +62,7 @@ def render_clip(
     model_tag: str,
     landmarks_dir: Path = LANDMARKS_DIR,
     overlays_dir: Path = OVERLAYS_DIR,
+    anchor_px: tuple[int, int] | None = None,
 ) -> Path:
     csv_path = landmarks_csv_path(landmarks_dir, clip_path, model_tag)
     if not csv_path.exists():
@@ -98,6 +104,12 @@ def render_clip(
                 r = int((7 if i in CORE_IDXS else 3) * scale)
                 cv2.circle(frame, (int(px[i]), int(py[i])), r,
                            vis_color(vs[frame_idx, i]), -1)
+        if anchor_px is not None:
+            ax, ay = int(anchor_px[0]), int(anchor_px[1])
+            cv2.drawMarker(frame, (ax, ay), (255, 0, 255), cv2.MARKER_CROSS,
+                           int(30 * scale), max(1, int(2 * scale)))
+            cv2.line(frame, (0, ay), (w, ay), (255, 0, 255),
+                     max(1, int(1 * scale)), cv2.LINE_AA)
         label = f"f{frame_idx}" + ("" if detected[frame_idx] else "  NO POSE")
         cv2.putText(frame, label, (10, int(30 * scale)), cv2.FONT_HERSHEY_SIMPLEX,
                     0.8 * scale, (255, 255, 255), max(1, int(2 * scale)))
@@ -117,7 +129,14 @@ def main() -> int:
                         help="where the landmark CSVs live (default: exp01 pool)")
     parser.add_argument("--out-dir", type=Path, default=None,
                         help="overlay output dir (default: overlays/ next to landmarks)")
+    parser.add_argument("--anchors", type=Path, default=None,
+                        help="anchors.json (exp02 variant D); draws each clip's "
+                             "reference-hold point")
     args = parser.parse_args()
+
+    anchors: dict = {}
+    if args.anchors:
+        anchors = json.loads(args.anchors.read_text()).get("anchors", {})
 
     out_dir = args.out_dir or args.landmarks_dir.parent / "overlays"
 
@@ -135,8 +154,11 @@ def main() -> int:
         return 1
 
     for clip in clips:
-        print(f"rendering: {clip.name} [{args.model}] ...", flush=True)
-        out = render_clip(clip, args.model, args.landmarks_dir, out_dir)
+        anchor = anchors.get(clip.name)
+        print(f"rendering: {clip.name} [{args.model}]"
+              + (" +anchor" if anchor else "") + " ...", flush=True)
+        out = render_clip(clip, args.model, args.landmarks_dir, out_dir,
+                          anchor_px=tuple(anchor["px"]) if anchor else None)
         print(f"  -> {out.name}")
     return 0
 
