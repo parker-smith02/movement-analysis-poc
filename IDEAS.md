@@ -122,6 +122,19 @@ variant A suffices) and cross-setup (~3.2 %, needs a two-point anchor to beat
 section. Remaining before a final call: more static-reset takes (df=2) and,
 if cross-setup <2 % is wanted, a two-point (scale+rotation) anchor.
 
+**exp03 update (2026-07-07): the background-registration idea above is now
+measured and it wins.** Zero-tap SIFT+RANSAC homography registers re-set
+takes to ~1–2 px on the wall plane (probe-evaluated); similarity (and hence
+any 2-tap scheme) fails at ~8 px because tripod re-sets change perspective;
+translation-only fails at distance (20 px at a 580 px lever). Two
+consequences: (a) **registration subsumes anchoring for diff mode** — once
+two attempts share a coordinate frame, attempt-vs-attempt deltas need no
+anchor tap at all; the clicked hold survives only for "position vs wall
+landmark" language. (b) The static-hold lab floors (3.18 %, 6.3 %) are
+dominated by the climber's own position reproduction, not the pipeline —
+measurement error is ~1.6 % torso (2σ ≈ 3.3 %), and body reproduction is
+signal in the product. See `lab/results/exp03-registration/findings.md`.
+
 ---
 
 ## 2026-07-06 — Hip-to-wall depth from limb foreshortening (feasibility note)
