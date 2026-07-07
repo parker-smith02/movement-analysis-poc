@@ -84,3 +84,74 @@ not to pose quality (hips held at ~14 px all along).
 
 Calibration (criterion 2) remains unevaluated — `calibration.json` in
 progress, feeds the absolute-cm question only.
+
+---
+
+# run 3 — near-hip anchor: the lever-arm hypothesis is confirmed, floor halved, still ~3 %
+
+_Generated 2026-07-07. Anchor re-clicked to a near-hip working-zone hold
+(`run3-near-anchor/anchors-near.json`), per-take median relative form (the
+form pre-registered in run 2 before these clicks existed). Frozen in
+`run3-near-anchor/`._
+
+## What moving the anchor did (measured)
+
+| quantity | top-row anchor (run 2) | near-hip anchor (run 3) |
+|---|---|---|
+| static-reset D/torso (df 2) | 8.15 % | **3.18 %** |
+| static-reset std_D_px | 9.8 px | **7.0 px** |
+| movement peaks D/torso (df 12) | 9.1 % | **3.63 %** |
+| anchor→hip distance, static (in torsos) | ~2.6 | **~0.03** |
+
+**The amplification mechanism is confirmed and removed.** With the anchor
+essentially at hip height (|D|/torso = 0.02–0.04 on the static-reset takes),
+the ratio floor (3.18 %) now equals the px floor (std_D_px 7.0 px ÷ 220 px
+torso = 3.17 %) — the torso-error × |D|/torso term that inflated run 2 to 8 %
+has collapsed. corr(|D|, torso) is still −0.99 but |D| is now tiny, so it no
+longer matters. The relative floor roughly halved on both static and movement.
+
+## Why it still doesn't clear 2 %, and what the residual is
+
+The remaining floor is **camera-re-set rotation/scale residual**, and this run
+isolates it cleanly. On the same clean-ankle static-reset takes:
+
+- ankle-anchored (variant B, body-fixed): **3.1 px**
+- hold-anchored (variant D, world-fixed): **7.0 px**
+
+The ankle is a *body*-fixed anchor: when the tripod is re-set and the camera
+rotates slightly, hips and ankle shift together and the difference survives.
+The hold is *world*-fixed, so that same camera rotation shows up as noise a
+single-point (translation-only) anchor cannot remove. The 7.0 px on
+static-reset is therefore a direct measurement of the tripod-re-set residual —
+exactly the thing "don't move the camera between attempts" filming guidance
+eliminates. (Movement's 3.63 % is slightly worse than static's 3.18 % because
+some moves still peak up to ~0.9 torso from the anchor — see per-move
+|Dpeak|/torso in the diagnostics; move5/move6 with the closest anchors are the
+tightest.)
+
+## What this means for the units decision
+
+The honest floor with a good world-fixed anchor is **~3.2 % (static, df 2) to
+3.6 % (movement, df 12) of torso length**, i.e. a minimum honestly-reportable
+hip-height difference of **2σ ≈ 6–7 % of torso ≈ ~3.5 cm** for a ~50 cm torso.
+The headline insights the product wants to make ("hips 8 cm higher" ≈ 16 % of
+torso) sit comfortably above this — **>2σ with margin** — so relative units
+are viable for the target insights even though the aspirational 2 % bar was
+not met. Two regimes to state explicitly in the product:
+
+- **Within one camera setup** (tripod untouched — the core compare-attempts
+  case, backed by filming guidance): no cross-setup residual; variant A alone
+  is enough and the floor is tighter.
+- **Across camera setups / sessions**: ~3.2 % floor with a near anchor. To go
+  below 2 % here needs a **two-point anchor** (correct scale + rotation, not
+  just translation) — the last cheap engineering lever.
+
+## Open items before the units decision is final
+
+1. **df = 2 on static-reset.** The 3.18 % rests on 3 takes; movement's 3.63 %
+   (df 12) is the more trustworthy number and agrees. Still worth ≥ 5
+   static-reset takes for a firm pass/fail.
+2. **Two-point anchor** — the one remaining lever to clear 2 % across setups.
+   Second click per take on a well-separated wall feature; recover a similarity
+   transform (scale + rotation + translation) instead of translation-only.
+3. Calibration (criterion 2) still unevaluated — feeds absolute-cm only.
