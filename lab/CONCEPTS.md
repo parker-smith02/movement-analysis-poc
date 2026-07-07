@@ -325,6 +325,42 @@ against the background. Consequences in this project:
   in [qa/warpdiff](results/exp03-registration/qa/). This residual body parallax
   is small for small camera moves and is part of the honest measurement floor.
 
+### Intra-take drift, and frame consistency
+
+"The camera is on a tripod, so it's static within a clip" turned out to be
+only *approximately* true. Registering a take's frame 0 to its own middle
+frame (which should be the identity mapping if truly static) measured
+**0.4–0.8 px** of drift on takes where the tripod hadn't been touched, but
+**2.9–7.2 px** on takes recorded right after the tripod was handled — the
+mount settles, and phone video stabilization (EIS — electronic image
+stabilization, which subtly re-crops each frame to smooth shake) can let the
+view wander.
+
+The practical rule this forces is **frame consistency**: a coordinate is only
+meaningful relative to the frame it was measured in. A point clicked at frame
+0 cannot be compared against a body position measured mid-take without
+accounting for the drift between those frames — doing so injected up to 34 px
+of phantom "error" in one intermediate exp03 run, and quietly inflated
+exp02's static-reset floor (frame-0 anchors vs mid-take hip medians). Fixes
+are cheap: compare like frames with like, register at the analysis frame, and
+as filming guidance, wait a few seconds after touching the phone before the
+attempt starts.
+
+### Control conditions and ground-truth-limited measurement
+
+When you evaluate a method against hand-made ground truth, the ground truth
+itself has error (your clicks wobble a few px; protruding holds add
+parallax). A **control condition** tells you how much: exp03 evaluated
+registration on *same-setup* pairs (camera untouched, so the true transform
+is ~identity and any residual is the evaluation's own noise) alongside the
+*re-set* pairs being tested. Result: re-set 2.02 px vs control 1.90 px —
+meaning the registration itself contributes only ~0.7 px
+(`sqrt(2.02² − 1.90²)`, quadrature in reverse) and the measurement is
+**ground-truth-limited**: the instrument being graded is more precise than
+the ruler grading it. When a result is at the control's level, the honest
+statement is "at least this good; the evaluation can't resolve further" —
+not a larger error bar.
+
 ### Why registration beats anchoring
 
 Once two attempts share a wall-fixed coordinate frame, the hip-height
@@ -424,3 +460,13 @@ could push down if it ever becomes worth it.
 - **Parallax** — apparent shift of objects at different depths when the camera
   moves; why protruding holds mislead and the climber ghosts.
 - **Quadrature** — combining independent errors as `sqrt(Σ σ²)`.
+- **Intra-take drift** — the view wandering a few px *within* one clip
+  (tripod settling, phone EIS); worst right after handling the phone.
+- **EIS (electronic image stabilization)** — phone video smoothing that
+  re-crops each frame; breaks the "static camera within a clip" assumption.
+- **Frame consistency** — only compare coordinates measured in the same
+  frame's geometry (or register between frames first).
+- **Control condition** — a case where the true answer is known (~identity)
+  run through the same evaluation, to measure the evaluation's own noise.
+- **Ground-truth-limited** — when the method under test is more precise than
+  the ruler grading it; read as "at least this good."

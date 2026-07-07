@@ -53,6 +53,17 @@ CORRECTED cross-setup noise floor directly — including the climber's own
 off-wall-plane parallax, which is real product error. Compared against the
 uncorrected (translation-only, exp02 variant D) floor on the same six takes.
 
+Intra-take drift: the camera is NOT perfectly static within a take — takes
+recorded right after the tripod was handled drift up to ~7 px between frame
+0 and mid-take (settling and/or phone stabilization), while untouched takes
+hold <1 px. Measured per take by registering frame 0 to the same take's
+middle frame (reported in summary.md). Consequence: every comparison must be
+frame-CONSISTENT — probe evaluation uses frame-0 features (the clicks were
+made at frame 0); the end-to-end floor uses mid-take features (the hip
+medians live mid-take). Mixing reference frames injects the drift as error
+(and exp02's frame-0 anchors vs mid-take hip medians did exactly that, so
+exp02's static-reset floor partly measures this drift).
+
 Outputs (lab/results/exp03-registration/): residuals.csv, summary.md,
 plots/residuals.png, qa/ (feature-match and warp-difference images).
 """
@@ -127,7 +138,13 @@ def fit_similarity_2pt(p1: tuple, p2: tuple, q1: tuple, q2: tuple):
 # ------------------------------------------------------------------- auto fits
 
 def person_mask(take: str, w: int, h: int) -> np.ndarray:
-    """255 everywhere except an expanded bbox around the pose landmarks."""
+    """255 everywhere except an expanded bbox around the pose landmarks.
+
+    Uses each landmark's MEDIAN position over the take (the climber holds one
+    position for most of a static take), not frame 0 — walking-in frames
+    scatter the frame-0 bbox and can mask out half the wall (measured: 57% on
+    sr1-3/sf1-1 vs ~35-42% elsewhere, starving the feature detector).
+    """
     mask = np.full((h, w), 255, np.uint8)
     csv_path = landmarks_csv_path(LANDMARKS_DIR, EXP02_DIR / take, "mediapipe")
     if not csv_path.exists():
@@ -136,9 +153,8 @@ def person_mask(take: str, w: int, h: int) -> np.ndarray:
     det = df[df["detected"] == 1]
     if det.empty:
         return mask
-    row = det.iloc[0]
-    xs = np.array([row[f"lm{i:02d}_x"] for i in range(N_LANDMARKS)]) * w
-    ys = np.array([row[f"lm{i:02d}_y"] for i in range(N_LANDMARKS)]) * h
+    xs = np.array([det[f"lm{i:02d}_x"].median() for i in range(N_LANDMARKS)]) * w
+    ys = np.array([det[f"lm{i:02d}_y"].median() for i in range(N_LANDMARKS)]) * h
     xs, ys = xs[~np.isnan(xs)], ys[~np.isnan(ys)]
     if not len(xs):
         return mask
@@ -150,10 +166,19 @@ def person_mask(take: str, w: int, h: int) -> np.ndarray:
     return mask
 
 
-def read_frame0(take: str) -> np.ndarray | None:
+def read_take_frame(take: str, mid: bool) -> np.ndarray | None:
+    """Frame 0 (where points were clicked) or the middle frame (where the
+    hip medians live). NOT interchangeable: the camera drifts within a take
+    (see docstring), so each comparison must stay frame-consistent."""
     cap = cv2.VideoCapture(str(EXP02_DIR / take))
     cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 1)
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if mid and n > 1:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, n // 2)
     ok, frame = cap.read()
+    if not ok:  # fall back to frame 0
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        ok, frame = cap.read()
     cap.release()
     return frame if ok else None
 
@@ -306,18 +331,36 @@ def main() -> int:
     (RESULTS_DIR / "plots").mkdir(parents=True, exist_ok=True)
     (RESULTS_DIR / "qa").mkdir(parents=True, exist_ok=True)
 
-    # features once per take
+    # features per take at BOTH reference frames (see docstring: the camera
+    # drifts within a take, so frame 0 and mid-take are distinct geometries)
     detector, norm, det_name = make_detector()
-    frames, feats = {}, {}
+    frames, feats0, featsM, drift_rows = {}, {}, {}, []
     for t in TAKES:
-        frame = read_frame0(t)
-        if frame is None:
+        f0, fm = read_take_frame(t, mid=False), read_take_frame(t, mid=True)
+        if f0 is None or fm is None:
             print(f"cannot read {t}")
             return 1
-        h, w = frame.shape[:2]
-        kp, des = detect_features(frame, person_mask(t, w, h), detector)
-        frames[t], feats[t] = frame, (kp, des)
-        print(f"{t}: {len(kp)} {det_name} features (person masked)")
+        h, w = f0.shape[:2]
+        mask = person_mask(t, w, h)
+        feats0[t] = detect_features(f0, mask, detector)
+        featsM[t] = detect_features(fm, mask, detector)
+        frames[t] = f0
+        # intra-take drift: register frame 0 to the same take's middle frame
+        drift = np.nan
+        m = match_features(feats0[t][1], featsM[t][1], norm)
+        auto = auto_transforms(feats0[t][0], featsM[t][0], m)
+        if "auto-homography" in auto:
+            probes = [d[t] for d in points.values() if t in d]
+            ds = [float(np.hypot(*(np.array(auto["auto-homography"]["apply"](p))
+                                   - p))) for p in probes]
+            drift = float(np.median(ds)) if ds else np.nan
+        drift_rows.append({"take": t, "class": ("same-setup" if t in
+                          SAME_SETUP_GROUP else "re-set"),
+                          "drift_px": drift})
+        print(f"{t}: {len(feats0[t][0])}/{len(featsM[t][0])} {det_name} "
+              f"features (frame0/mid, person masked); intra-take drift "
+              f"{drift:.1f} px")
+    drift_df = pd.DataFrame(drift_rows)
 
     rows, pair_meta, homs = [], [], {}
     for a, b in itertools.combinations(TAKES, 2):
@@ -348,17 +391,25 @@ def main() -> int:
             if fit:
                 record("similarity-2pt", fit, {n1, n2})
 
-        # automatic, from background features (clicked points all held out)
-        kpA, desA = feats[a]
-        kpB, desB = feats[b]
+        # automatic, from frame-0 background features — the same frame the
+        # points were clicked at (clicked points all held out of the fit)
+        kpA, desA = feats0[a]
+        kpB, desB = feats0[b]
         matches = (match_features(desA, desB, norm)
                    if desA is not None and desB is not None else [])
         auto = auto_transforms(kpA, kpB, matches)
-        if "auto-homography" in auto:
-            homs[(a, b)] = auto["auto-homography"]["H"]
         for method in ("auto-similarity", "auto-homography"):
             if method in auto:
                 record(method, auto[method]["apply"], set())
+        # mid-take homography for the end-to-end floor (hip medians live
+        # mid-take; frame-0 homographies would inject the intra-take drift)
+        kpAm, desAm = featsM[a]
+        kpBm, desBm = featsM[b]
+        auto_m = auto_transforms(
+            kpAm, kpBm, match_features(desAm, desBm, norm)
+            if desAm is not None and desBm is not None else [])
+        if "auto-homography" in auto_m:
+            homs[(a, b)] = auto_m["auto-homography"]["H"]
         pair_meta.append({"take_a": a, "take_b": b, "class": pair_class,
                           "n_matches": auto.get("n_matches", 0),
                           "inl_sim": auto.get("auto-similarity", {}).get("n_inliers", 0),
@@ -444,9 +495,19 @@ def main() -> int:
         "",
         agg.to_string(index=False, float_format=lambda v: f"{v:.2f}"),
         "",
-        "Auto-method match/inlier counts per pair:",
+        "Auto-method match/inlier counts per pair (frame-0 features):",
         "",
         meta.to_string(index=False),
+        "",
+        "## Intra-take camera drift (frame 0 → mid-take, same take)",
+        "",
+        "The camera is not perfectly static within a take: takes recorded "
+        "right after the tripod was handled settle/drift, untouched takes "
+        "hold <1 px. Frame-0 clicks and mid-take measurements are therefore "
+        "different geometries — comparisons must be frame-consistent.",
+        "",
+        drift_df.to_string(index=False,
+                           float_format=lambda v: f"{v:.2f}"),
         "",
     ]
     if reset_meds:
@@ -486,11 +547,13 @@ def main() -> int:
             "## End-to-end: relative hip-height floor over all six takes "
             f"(same position, true delta zero, df={e2e['n'] - 1})",
             "",
-            f"- uncorrected (exp02 variant D, per-take near anchor): "
+            f"- uncorrected (exp02 variant D: frame-0 anchor vs mid-take "
+            f"hips, so it carries each take's intra-take drift): "
             f"std **{e2e['std_uncorrected_pct']:.2f}% torso** "
             f"(2σ {2 * e2e['std_uncorrected_pct']:.2f}%)",
-            f"- homography-corrected (all takes in {REF_TAKE} coordinates, "
-            f"zero taps): std **{e2e['std_corrected_pct']:.2f}% torso** "
+            f"- homography-corrected (mid-take features, all takes in "
+            f"{REF_TAKE} coordinates, zero taps): "
+            f"std **{e2e['std_corrected_pct']:.2f}% torso** "
             f"(2σ {2 * e2e['std_corrected_pct']:.2f}%)",
             "",
             f"vs the 2% criterion-1 bar. Includes the climber's off-plane "
