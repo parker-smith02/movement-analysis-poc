@@ -1,6 +1,8 @@
 # exp03 findings — auto-registration solves the camera problem; the lab floor was measuring the climber, not the pipeline
 
-_Generated 2026-07-07. Companion to the auto-generated `summary.md`.
+_Generated 2026-07-07. Companion to the auto-generated `summary.md`. New to
+the CV/measurement terms below (registration, homography, parallax, noise
+floor, 2σ)? See the primer at [`lab/CONCEPTS.md`](../../CONCEPTS.md)._
 Data: the six pos1 takes (sf1 = tripod untouched, sr1 = tripod re-set), two
 known hold correspondences per take reused from the frozen exp02 anchor sets,
 SIFT features with the climber masked out via the exp02 landmarks._
